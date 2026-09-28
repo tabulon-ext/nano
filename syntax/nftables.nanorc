@@ -1,6 +1,6 @@
 ## Syntax highlighting for the packet-filtering rules of Netfilter.
 
-## Original author:  Arturo Borrero González <arturo@debian.org>
+## Original author:  Arturo Borrero González
 ## License:  GPL version 3 or newer
 
 syntax nftables "\.(nft|nftables)$"
@@ -25,9 +25,11 @@ color cyan "(^|[[:blank:]])#.*"
 # Trailing whitespace
 color ,green "[[:space:]]+$"
 
-# Strings and others
-color yellow ""(\\.|[^"])*"" "'(\\.|[^'])*'"
-color green "[{}():;|`$<>!=&\\]" "(\]|\[)"
+# Strings
+color yellow ""([^"\]|\\.)*"|'([^'\]|\\.)*'"
+
+# Syntactic symbols
+color green "[][{}():;|`$<>!=&\]"
 
 # Basic variable names
 color brightred "(\$|@)[[:alpha:]_-][[:alnum:]_.-]*"

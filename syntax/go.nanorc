@@ -26,24 +26,23 @@ color magenta "\<(break|continue|fallthrough|goto|return)\>"
 color brightcyan "\<(package|import)\>"
 
 # Literals.
-color red "\<([1-9][0-9]*|0[0-7]*|0[xX][0-9A-Fa-f]+)\>"
+color red "\<(true|false|nil|iota|_)\>"
+color red "\<([1-9][0-9]*|0[0-7]*|0[xX][[:xdigit:]]+)\>"
 color red "\<[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?i?\>"
 color red "\<[0-9]+[eE][+-]?[0-9]+i?\>"
 color red "\B\.[0-9]+([eE][+-]?[0-9]+)?i?\>"
 color red "\<[0-9]+i\>"
 
 # Strings and characters; slightly fuzzy.
-color red "\<(true|false|nil|iota|_)\>"
-color red "'(\\.|[^'])+'"
-color red ""(\\.|[^"])*""
-color red start=""(\\.|[^"])*\\[[:blank:]]*$" end="^(\\.|[^"])*""
+color red ""([^"\]|\\.)*"|'([^'\]|\\.)+'"
+color red start=""([^"\]|\\.)*\\[[:blank:]]*$" end="^([^"\]|\\.)*""
 
 # Comments.
 color brightblue "//.*"
 color brightblue start="/\*" end="\*/"
 
 # Special comments.
-color brightcyan "//[[:blank:]]*\+build[[:blank:]]+(([a-zA-Z_0-9]+[[:blank:]]*)+,[[:blank:]]*)*[a-zA-Z_0-9]+"
+color brightcyan "//[[:blank:]]*\+build[[:blank:]]+(([[:alnum:]_]+[[:blank:]]*)+,[[:blank:]]*)*[[:alnum:]_]+"
 
 # Trailing whitespace.
 color ,green "[[:space:]]+$"

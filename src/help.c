@@ -1,7 +1,7 @@
 /**************************************************************************
  *   help.c  --  This file is part of GNU nano.                           *
  *                                                                        *
- *   Copyright (C) 2000-2011, 2013-2021 Free Software Foundation, Inc.    *
+ *   Copyright (C) 2000-2011, 2013-2026 Free Software Foundation, Inc.    *
  *   Copyright (C) 2017 Rishabh Dave                                      *
  *   Copyright (C) 2014-2019 Benno Schulenberg                            *
  *                                                                        *
@@ -16,7 +16,7 @@
  *   See the GNU General Public License for more details.                 *
  *                                                                        *
  *   You should have received a copy of the GNU General Public License    *
- *   along with this program.  If not, see http://www.gnu.org/licenses/.  *
+ *   along with this program.  If not, see https://gnu.org/licenses/.     *
  *                                                                        *
  **************************************************************************/
 
@@ -50,7 +50,7 @@ void help_init(void)
 	char *ptr;
 
 	/* First, set up the initial help text for the current function. */
-	if (currmenu & (MWHEREIS|MREPLACE|MREPLACEWITH)) {
+	if (currmenu & (MWHEREIS|MREPLACE)) {
 		htx[0] = N_("Search Command Help Text\n\n "
 				"Enter the words or characters you would like to "
 				"search for, and then press Enter.  If there is a "
@@ -64,6 +64,13 @@ void help_init(void)
 				"search to replace, only matches in the selected text "
 				"will be replaced.\n\n The following function keys are "
 				"available in Search mode:\n\n");
+		htx[2] = NULL;
+	} else if (currmenu == MREPLACEWITH) {
+		htx[0] = N_("=== Replacement ===\n\n "
+				"Type the characters that should replace what you "
+				"typed at the previous prompt, and press Enter.\n\n");
+		htx[1] = N_(" The following function keys "
+				"are available at this prompt:\n\n");
 		htx[2] = NULL;
 	} else if (currmenu == MGOTOLINE) {
 		htx[0] = N_("Go To Line Help Text\n\n "
@@ -126,8 +133,8 @@ void help_init(void)
 				"shown in brackets after the search prompt.  Hitting "
 				"Enter without entering any text will perform the "
 				"previous search.\n\n");
-		htx[1] = N_(" The following function keys are available in "
-				"Browser Search mode:\n\n");
+		htx[1] = N_(" The following function keys "
+				"are available at this prompt:\n\n");
 		htx[2] = NULL;
 	} else if (currmenu == MGOTODIR) {
 		htx[0] = N_("Browser Go To Directory Help Text\n\n "
@@ -143,16 +150,14 @@ void help_init(void)
 #endif /* ENABLE_BROWSER */
 #ifdef ENABLE_SPELLER
 	else if (currmenu == MSPELL) {
-		htx[0] = N_("Spell Check Help Text\n\n "
-				"The spell checker checks the spelling of all text in "
-				"the current file.  When an unknown word is "
-				"encountered, it is highlighted and a replacement can "
-				"be edited.  It will then prompt to replace every "
-				"instance of the given misspelled word in the current "
-				"file, or, if you have selected text with the mark, in "
-				"the selected text.\n\n The following function keys "
-				"are available in Spell Check mode:\n\n");
-		htx[1] = NULL;
+		htx[0] = N_("=== Spelling correction ===\n\n "
+				"The spell checker has examined the spelling of all text "
+				"in the current buffer or marked region.  An unknown word "
+				"has been encountered -- it is highlighted and a replacement "
+				"can now be edited.  After this you will be asked whether "
+				"to replace each instance of that unknown word.\n\n");
+		htx[1] = N_(" The following function keys "
+				"are available at this prompt:\n\n");
 		htx[2] = NULL;
 	}
 #endif /* ENABLE_SPELLER */
@@ -167,8 +172,8 @@ void help_init(void)
 		htx[1] = N_("If you just need another blank buffer, do not enter any "
 				"command.\n\n You can also pick one of four tools, or cut a "
 				"large piece of the buffer, or put the editor to sleep.\n\n");
-		htx[2] = N_(" The following function keys are "
-				"available in Execute Command mode:\n\n");
+		htx[2] = N_(" The following function keys "
+				"are available at this prompt:\n\n");
 	} else if (currmenu == MLINTER) {
 		htx[0] = N_("=== Linter ===\n\n "
 				"In this mode, the status bar shows an error message or "
@@ -208,15 +213,15 @@ void help_init(void)
 	}
 
 	htx[0] = _(htx[0]);
-	if (htx[1] != NULL)
+	if (htx[1])
 		htx[1] = _(htx[1]);
-	if (htx[2] != NULL)
+	if (htx[2])
 		htx[2] = _(htx[2]);
 
 	allocsize += strlen(htx[0]);
-	if (htx[1] != NULL)
+	if (htx[1])
 		allocsize += strlen(htx[1]);
-	if (htx[2] != NULL)
+	if (htx[2])
 		allocsize += strlen(htx[2]);
 
 	/* Calculate the length of the descriptions of the shortcuts.
@@ -224,7 +229,7 @@ void help_init(void)
 	 * plus translated text, plus one or two \n's. */
 	for (f = allfuncs; f != NULL; f = f->next)
 		if (f->menus & currmenu)
-			allocsize += strlen(_(f->help)) + 21;
+			allocsize += strlen(_(f->phrase)) + 21;
 
 #ifndef NANO_TINY
 	/* If we're on the main list, we also count the toggle help text.
@@ -234,8 +239,8 @@ void help_init(void)
 		size_t onoff_len = strlen(_("enable/disable"));
 
 		for (s = sclist; s != NULL; s = s->next)
-			if (s->func == do_toggle_void)
-				allocsize += strlen(_(flagtostr(s->toggle))) + onoff_len + 9;
+			if (s->func == do_toggle)
+				allocsize += strlen(_(epithet_of_flag(s->toggle))) + onoff_len + 9;
 	}
 #endif
 
@@ -244,9 +249,9 @@ void help_init(void)
 
 	/* Now add the text we want. */
 	strcpy(help_text, htx[0]);
-	if (htx[1] != NULL)
+	if (htx[1])
 		strcat(help_text, htx[1]);
-	if (htx[2] != NULL)
+	if (htx[2])
 		strcat(help_text, htx[2]);
 
 	/* Remember this end-of-introduction, start-of-shortcuts. */
@@ -267,10 +272,10 @@ void help_init(void)
 				if (++tally == 1) {
 					sprintf(ptr, "%s                ", s->keystr);
 					/* Unicode arrows take three bytes instead of one. */
-					ptr += (strstr(s->keystr, "\xE2") != NULL ? 9 : 7);
+					ptr += (strstr(s->keystr, "\xE2") ? 9 : 7);
 				} else {
 					sprintf(ptr, "(%s)       ", s->keystr);
-					ptr += (strstr(s->keystr, "\xE2") != NULL ? 12 : 10);
+					ptr += (strstr(s->keystr, "\xE2") ? 12 : 10);
 					break;
 				}
 			}
@@ -282,54 +287,54 @@ void help_init(void)
 			ptr += 10;
 
 		/* The shortcut's description. */
-		ptr += sprintf(ptr, "%s\n", _(f->help));
+		ptr += sprintf(ptr, "%s\n", _(f->phrase));
 
 		if (f->blank_after)
 			ptr += sprintf(ptr, "\n");
 	}
 
 #ifndef NANO_TINY
-	/* And the toggles... */
+	/* In the main help text, show the toggles in their original order. */
 	if (currmenu == MMAIN) {
-		int maximum = 0, counter = 0;
-
-		/* First see how many toggles there are. */
-		for (s = sclist; s != NULL; s = s->next)
-			maximum = (s->toggle && s->ordinal > maximum) ? s->ordinal : maximum;
-
-		/* Now show them in the original order. */
-		while (counter < maximum) {
-			counter++;
+		for (int flag = ZERO; flag <= USE_MOUSE; flag++) {
 			for (s = sclist; s != NULL; s = s->next)
-				if (s->toggle && s->ordinal == counter) {
+				if (s->toggle == flag) {
 					ptr += sprintf(ptr, "%s\t\t %s %s\n", (s->menus & MMAIN ? s->keystr : ""),
-								_(flagtostr(s->toggle)), _("enable/disable"));
-					if (s->toggle == NO_SYNTAX || s->toggle == TABS_TO_SPACES)
+								_(epithet_of_flag(s->toggle)), _("enable/disable"));
+					/* Add blank line in three places to separate four grouplets. */
+					if (s->toggle == LINE_NUMBERS || s->toggle == SOFTWRAP || s->toggle == AUTOINDENT)
 						ptr += sprintf(ptr, "\n");
 					break;
 				}
 		}
 	}
-#endif /* !NANO_TINY */
+#endif
 }
 
 /* Hard-wrap the concatenated help text, and write it into a new buffer. */
 void wrap_help_text_into_buffer(void)
 {
-	size_t sum = 0;
 	/* Avoid overtight and overwide paragraphs in the introductory text. */
-	size_t wrapping_point = ((COLS < 40) ? 40 : (COLS > 74) ? 74 : COLS) - thebar;
+	size_t wrapping_point = ((COLS < 40) ? 40 : (COLS > 74) ? 74 : COLS) - sidebar;
 	const char *ptr = start_of_body;
+	size_t sum = 0;
 
 	make_new_buffer();
 
+	/* Ensure there is a blank line at the top of the text, for esthetics. */
+	if ((ISSET(MINIBAR) || !ISSET(EMPTY_LINE)) && LINES > 6) {
+		openfile->current->data = mallocstrcpy(openfile->current->data, " ");
+		openfile->current->next = make_new_node(openfile->current);
+		openfile->current = openfile->current->next;
+	}
+
 	/* Copy the help text into the just-created new buffer. */
-	while (*ptr != '\0') {
+	while (*ptr) {
 		int length, shim;
 		char *oneline;
 
 		if (ptr == end_of_intro)
-			wrapping_point = ((COLS < 40) ? 40 : COLS) - thebar;
+			wrapping_point = ((COLS < 40) ? 40 : COLS) - sidebar;
 
 		if (ptr < end_of_intro || *(ptr - 1) == '\n') {
 			length = break_line(ptr, wrapping_point, TRUE);
@@ -337,7 +342,7 @@ void wrap_help_text_into_buffer(void)
 			shim = (*(ptr + length - 1) == ' ') ? 0 : 1;
 			snprintf(oneline, length + shim, "%s", ptr);
 		} else {
-			length = break_line(ptr, ((COLS < 40) ? 22 : COLS - 18) - thebar, TRUE);
+			length = break_line(ptr, ((COLS < 40) ? 22 : COLS - 18) - sidebar, TRUE);
 			oneline = nmalloc(length + 5);
 			snprintf(oneline, length + 5, "\t\t  %s", ptr);
 		}
@@ -381,7 +386,7 @@ void wrap_help_text_into_buffer(void)
 void show_help(void)
 {
 	int kbinput = ERR;
-	functionptrtype func;
+	functionptrtype function;
 		/* The function of the key the user typed in. */
 	int oldmenu = currmenu;
 		/* The menu we were called from. */
@@ -389,10 +394,13 @@ void show_help(void)
 	int was_margin = margin;
 #endif
 	ssize_t was_tabsize = tabsize;
+#ifndef NANO_TINY
+	bool was_lighted = spotlighted;
+#endif
 #ifdef ENABLE_COLOR
 	char *was_syntax = syntaxstr;
 #endif
-	char *saved_answer = (answer != NULL) ? copy_of(answer) : NULL;
+	char *saved_answer = (answer) ? copy_of(answer) : NULL;
 		/* The current answer when the user invokes help at the prompt. */
 	unsigned stash[sizeof(flags) / sizeof(flags[0])];
 		/* A storage place for the current flag settings. */
@@ -403,8 +411,9 @@ void show_help(void)
 	memcpy(stash, flags, sizeof(flags));
 
 	/* Ensure that the help screen's shortcut list can be displayed. */
-	if (ISSET(NO_HELP) && LINES > 4) {
+	if (ISSET(NO_HELP) || ISSET(ZERO)) {
 		UNSET(NO_HELP);
+		UNSET(ZERO);
 		window_init();
 	} else
 		blank_statusbar();
@@ -415,14 +424,15 @@ void show_help(void)
 	UNSET(USE_REGEXP);
 
 	UNSET(WHITESPACE_DISPLAY);
-	UNSET(NOREAD_MODE);
 
 #ifdef ENABLE_LINENUMBERS
-	UNSET(LINE_NUMBERS);
-	editwincols = COLS - thebar;
+	editwincols = COLS - sidebar;
 	margin = 0;
 #endif
 	tabsize = 8;
+#ifndef NANO_TINY
+	spotlighted = FALSE;
+#endif
 #ifdef ENABLE_COLOR
 	syntaxstr = "nanohelp";
 #endif
@@ -456,52 +466,50 @@ void show_help(void)
 		focusing = TRUE;
 
 		/* Show the cursor when we searched and found something. */
-		kbinput = get_kbinput(edit, didfind == 1 || ISSET(SHOW_CURSOR));
+		kbinput = get_kbinput(midwin, didfind == 1 || ISSET(SHOW_CURSOR));
 
 		didfind = 0;
 
 #ifndef NANO_TINY
 		spotlighted = FALSE;
-		hide_cursor = FALSE;
-
-		if (bracketed_paste || kbinput == BRACKETED_PASTE_MARKER) {
-			beep();
-			continue;
-		}
 #endif
-		func = interpret(&kbinput);
+		function = interpret(kbinput);
 
-		if (func == full_refresh) {
-			full_refresh();
-		} else if (ISSET(SHOW_CURSOR) && (func == do_left || func == do_right ||
-											func == do_up || func == do_down)) {
-			func();
-		} else if (func == do_up || func == do_scroll_up) {
+		if (ISSET(SHOW_CURSOR) && (function == do_left || function == do_right ||
+									function == do_up || function == do_down)) {
+			function();
+		} else if (function == do_up || function == do_scroll_up) {
 			do_scroll_up();
-		} else if (func == do_down || func == do_scroll_down) {
+		} else if (function == do_down || function == do_scroll_down) {
 			if (openfile->edittop->lineno + editwinrows - 1 < openfile->filebot->lineno)
 				do_scroll_down();
-		} else if (func == do_page_up || func == do_page_down ||
-					func == to_first_line || func == to_last_line) {
-			func();
-		} else if (func == do_search_backward || func == do_search_forward ||
-					func == do_findprevious || func == do_findnext) {
-			func();
+		} else if (function == do_page_up || function == do_page_down ||
+					function == to_first_line || function == to_last_line) {
+			function();
+		} else if (function == do_search_backward || function == do_search_forward ||
+					function == do_findprevious || function == do_findnext) {
+			function();
 			bottombars(MHELP);
 #ifdef ENABLE_NANORC
-		} else if (func == (functionptrtype)implant) {
-			implant(first_sc_for(MHELP, func)->expansion);
+		} else if (function == (functionptrtype)implant) {
+			implant(first_sc_for(MHELP, function)->expansion);
 #endif
 #ifdef ENABLE_MOUSE
 		} else if (kbinput == KEY_MOUSE) {
 			int dummy_row, dummy_col;
-			get_mouseinput(&dummy_row, &dummy_col, TRUE);
+			get_mouseinput(&dummy_row, &dummy_col);
 #endif
 #ifndef NANO_TINY
-		} else if (kbinput == KEY_WINCH) {
+		} else if (kbinput == START_OF_PASTE) {
+			while (get_kbinput(midwin, BLIND) != END_OF_PASTE)
+				;
+			statusline(AHEM, _("Paste is ignored"));
+		} else if (kbinput == THE_WINDOW_RESIZED) {
 			;  /* Nothing to do. */
 #endif
-		} else if (func == do_exit) {
+		} else if (function == full_refresh) {
+			full_refresh();
+		} else if (function == do_exit) {
 			break;
 		} else
 			unbound_key(kbinput);
@@ -526,9 +534,12 @@ void show_help(void)
 
 #ifdef ENABLE_LINENUMBERS
 	margin = was_margin;
-	editwincols = COLS - margin - thebar;
+	editwincols = COLS - margin - sidebar;
 #endif
 	tabsize = was_tabsize;
+#ifndef NANO_TINY
+	spotlighted = was_lighted;
+#endif
 #ifdef ENABLE_COLOR
 	syntaxstr = was_syntax;
 	have_palette = FALSE;
@@ -543,16 +554,15 @@ void show_help(void)
 
 	curs_set(0);
 
-	if (ISSET(NO_HELP)) {
-		currmenu = oldmenu;
+	if (ISSET(NO_HELP) || ISSET(ZERO))
 		window_init();
-	} else {
+	else
 		blank_statusbar();
-		bottombars(oldmenu);
-	}
+
+	bottombars(oldmenu);
 
 #ifdef ENABLE_BROWSER
-	if (oldmenu & (MBROWSER|MWHEREISFILE|MGOTODIR))
+	if (oldmenu & (MBROWSER|MGOTODIR|MWHEREISFILE))
 		browser_refresh();
 	else
 #endif

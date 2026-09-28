@@ -1,8 +1,8 @@
 /**************************************************************************
  *   definitions.h  --  This file is part of GNU nano.                    *
  *                                                                        *
- *   Copyright (C) 1999-2011, 2013-2021 Free Software Foundation, Inc.    *
- *   Copyright (C) 2014-2017 Benno Schulenberg                            *
+ *   Copyright (C) 1999-2011, 2013-2026 Free Software Foundation, Inc.    *
+ *   Copyright (C) 2014-2017, 2020-2022, 2024 Benno Schulenberg           *
  *                                                                        *
  *   GNU nano is free software: you can redistribute it and/or modify     *
  *   it under the terms of the GNU General Public License as published    *
@@ -15,7 +15,7 @@
  *   See the GNU General Public License for more details.                 *
  *                                                                        *
  *   You should have received a copy of the GNU General Public License    *
- *   along with this program.  If not, see http://www.gnu.org/licenses/.  *
+ *   along with this program.  If not, see https://gnu.org/licenses/.     *
  *                                                                        *
  **************************************************************************/
 
@@ -29,12 +29,21 @@
 #endif
 #endif
 
+#if defined(__HAIKU__) && !defined(_DEFAULT_SOURCE)
+#define _DEFAULT_SOURCE  1
+#endif
+
 #ifdef __TANDEM
 /* Tandem NonStop Kernel support. */
 #include <floss.h>
 #define ROOT_UID  65535
 #else
 #define ROOT_UID  0
+#endif
+
+#if defined(__APPLE__) && !defined(st_atim)
+#define st_atim  st_atimespec
+#define st_mtim  st_mtimespec
 #endif
 
 #ifdef HAVE_LIMITS_H
@@ -56,10 +65,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-/* Prefer wide ncurses over normal ncurses over curses. */
-#if defined(HAVE_NCURSESW_NCURSES_H)
-#include <ncursesw/ncurses.h>
-#elif defined(HAVE_NCURSES_H)
+#ifdef HAVE_NCURSES_H
 #include <ncurses.h>
 #else
 #include <curses.h>
@@ -104,12 +110,25 @@
 #define BACKWARD  FALSE
 #define FORWARD  TRUE
 
+#define YESORNO  FALSE
+#define YESORALLORNO  TRUE
+
+#define YES      1
+#define ALL      2
+#define NO       0
+#define CANCEL  -1
+
 #define BLIND  FALSE
 #define VISIBLE  TRUE
 
 #define JUSTFIND   0
 #define REPLACING  1
 #define INREGION   2
+
+#define NONOTES  FALSE
+
+#define PRUNE_DUPLICATE  TRUE
+#define IGNORE_DUPLICATES  FALSE
 
 #ifdef ENABLE_UTF8
 /* In UTF-8 a valid character is at most four bytes long. */
@@ -123,6 +142,9 @@
 
 /* The default number of columns from end of line where wrapping occurs. */
 #define COLUMNS_FROM_EOL  8
+
+/* The number of columns the cursor should stay away from the edge. */
+#define CUSHION  3
 
 /* The default comment character when a syntax does not specify any. */
 #define GENERAL_COMMENT_CHARACTER  "#"
@@ -148,8 +170,6 @@
 		/* The start regex matches on an earlier line, the end regex on this one. */
 #define JUSTONTHIS   (1<<5)
 		/* Both the start and end regexes match within this line. */
-#define WOULDBE      (1<<6)
-		/* An unpaired start match is on or before this line. */
 #endif
 
 /* Basic control codes. */
@@ -175,6 +195,8 @@
 #define ALT_RIGHT     0x422
 #define ALT_UP        0x423
 #define ALT_DOWN      0x424
+#define ALT_HOME      0x425
+#define ALT_END       0x426
 #define ALT_PAGEUP    0x427
 #define ALT_PAGEDOWN  0x428
 #define ALT_INSERT    0x42C
@@ -183,8 +205,6 @@
 #define SHIFT_ALT_RIGHT  0x432
 #define SHIFT_ALT_UP     0x433
 #define SHIFT_ALT_DOWN   0x434
-//#define SHIFT_LEFT 0x451
-//#define SHIFT_RIGHT 0x452
 #define SHIFT_UP        0x453
 #define SHIFT_DOWN      0x454
 #define SHIFT_HOME      0x455
@@ -194,28 +214,43 @@
 #define SHIFT_DELETE    0x45D
 #define SHIFT_TAB       0x45F
 
-/* A special keycode for when <Tab> is pressed while the mark is on. */
-#define INDENT_KEY  0x4F1
+#define FOCUS_IN   0x491
+#define FOCUS_OUT  0x499
 
-/* A special keycode to signal the beginning and end of a bracketed paste. */
-#define BRACKETED_PASTE_MARKER  0x4FB
+/* Custom keycodes for signaling the start and end of a bracketed paste. */
+#define START_OF_PASTE  0x4B5
+#define END_OF_PASTE    0x4BE
+
+/* Special keycodes for when a string bind has been partially implanted
+ * or has an unpaired opening brace, or when a function in a string bind
+ * needs execution or a specified function name is invalid. */
+#define MORE_PLANTS        0x4EA
+#define MISSING_BRACE      0x4EB
+#define PLANTED_A_COMMAND  0x4EC
+#define NO_SUCH_FUNCTION   0x4EF
+
+#ifndef NANO_TINY
+/* A special keycode for Ctrl + the central key on the numeric keypad. */
+#define KEY_CENTER  0x4F0
+
+/* A special keycode for when we get a SIGWINCH (a window resize). */
+#define THE_WINDOW_RESIZED  0x4F7
+#endif
 
 /* A special keycode for when a key produces an unknown escape sequence. */
 #define FOREIGN_SEQUENCE  0x4FC
 
 /* A special keycode for plugging into the input stream after a suspension. */
-#define KEY_FLUSH  KEY_F0
+#define KEY_FRESH  0x4FE
 
 #ifndef NANO_TINY
-/* A special keycode for when we get a SIGWINCH (a window resize). */
-#define KEY_WINCH  -2
-
 /* Some extra flags for the undo function. */
 #define WAS_BACKSPACE_AT_EOF  (1<<1)
 #define WAS_WHOLE_LINE        (1<<2)
 #define INCLUDED_LAST_LINE    (1<<3)
 #define MARK_WAS_SET          (1<<4)
 #define CURSOR_WAS_AT_HEAD    (1<<5)
+#define HAD_ANCHOR_AT_START   (1<<6)
 #endif /* !NANO_TINY */
 
 /* Identifiers for the different menus. */
@@ -246,7 +281,7 @@
 
 /* Enumeration types. */
 typedef enum {
-	UNSPECIFIED, NIX_FILE, DOS_FILE, MAC_FILE
+	UNSPECIFIED, NIX_FILE, DOS_FILE
 } format_type;
 
 typedef enum {
@@ -254,8 +289,8 @@ typedef enum {
 } message_type;
 
 typedef enum {
-	OVERWRITE, APPEND, PREPEND
-} kind_of_writing_type;
+	OVERWRITE, APPEND, PREPEND, SPECIAL
+} writing_type;
 
 typedef enum {
 	CENTERING, FLOWING, STATIONARY
@@ -283,6 +318,7 @@ enum {
 	SCROLL_BAR,
 	SELECTED_TEXT,
 	SPOTLIGHTED,
+	MINI_INFOBAR,
 	PROMPT_BAR,
 	STATUS_BAR,
 	ERROR_MESSAGE,
@@ -294,53 +330,56 @@ enum {
 /* Enumeration used in the flags array.  See the definition of FLAGMASK. */
 enum {
 	DONTUSE = 0,
-	CASE_SENSITIVE,
-	CONSTANT_SHOW,
+	ZERO,			/* The thirteen togglable flags should come first... */
 	NO_HELP,
-	SUSPENDABLE,
-	NO_WRAP,
+	CONSTANT_SHOW,
+	LINE_NUMBERS,
+	WHITESPACE_DISPLAY,
+	NO_SYNTAX,
+	SOFTWRAP,
+	BREAK_LONG_LINES,
+	TABS_TO_SPACES,
 	AUTOINDENT,
-	VIEW_MODE,
-	USE_MOUSE,
-	USE_REGEXP,
-	SAVE_ON_EXIT,
+	SMART_HOME,
 	CUT_FROM_CURSOR,
+	USE_MOUSE,		/* ... and in this exact order. */
+	CASE_SENSITIVE,
+	USE_REGEXP,
 	BACKWARDS_SEARCH,
-	MULTIBUFFER,
-	REBIND_DELETE,
-	RAW_SEQUENCES,
+	COLON_PARSING,
+	NOREAD_MODE,
+	LOCKING,
+	RESTRICTED,
+	VIEW_MODE,
+	USE_MAGIC,
+	NEW_BUFFER,
 	NO_CONVERT,
+	NO_NEWLINES,
+	HISTORYLOG,
+	POSITIONLOG,
 	MAKE_BACKUP,
 	INSECURE_BACKUP,
-	NO_SYNTAX,
-	PRESERVE,
-	HISTORYLOG,
-	RESTRICTED,
-	SMART_HOME,
-	WHITESPACE_DISPLAY,
-	TABS_TO_SPACES,
-	QUICK_BLANK,
-	WORD_BOUNDS,
-	NO_NEWLINES,
-	BOLD_TEXT,
-	SOFTWRAP,
-	POSITIONLOG,
-	LOCKING,
-	NOREAD_MODE,
+	SAVE_ON_EXIT,
 	MAKE_IT_UNIX,
-	TRIM_BLANKS,
-	SHOW_CURSOR,
-	LINE_NUMBERS,
-	AT_BLANKS,
-	AFTER_ENDS,
+	PRESERVE,
+	REBIND_DELETE,
+	RAW_SEQUENCES,
+	MODERN_BINDINGS,
 	LET_THEM_ZAP,
-	BREAK_LONG_LINES,
+	AFTER_ENDS,
+	WORD_BOUNDS,
+	AT_BLANKS,
+	TRIM_BLANKS,
+	BOOKSTYLE,
+	NO_WRAP,
 	JUMPY_SCROLLING,
+	SOLO_SIDESCROLL,
+	QUICK_BLANK,
+	SHOW_CURSOR,
+	BOLD_TEXT,
 	EMPTY_LINE,
 	INDICATOR,
-	BOOKSTYLE,
 	STATEFLAGS,
-	USE_MAGIC,
 	MINIBAR
 };
 
@@ -402,7 +441,7 @@ typedef struct syntaxtype {
 		/* The command with which to lint this type of file. */
 	char *formatter;
 		/* The command with which to format/modify/arrange this type of file. */
-	char *tab;
+	char *tabstring;
 		/* What the Tab key should produce; NULL for default behavior. */
 #ifdef ENABLE_COMMENT
 	char *comment;
@@ -410,7 +449,7 @@ typedef struct syntaxtype {
 #endif
 	colortype *color;
 		/* The colors and their regexes used in this syntax. */
-	short nmultis;
+	short multiscore;
 		/* How many multiline regex strings this syntax has. */
 	struct syntaxtype *next;
 		/* Next syntax. */
@@ -493,16 +532,18 @@ typedef struct undostruct {
 #endif /* !NANO_TINY */
 
 #ifdef ENABLE_HISTORIES
-typedef struct poshiststruct {
+typedef struct positionstruct {
 	char *filename;
 		/* The full path plus name of the file. */
 	ssize_t linenumber;
-		/* The line where the cursor was when we closed the file. */
+		/* The line where the cursor was when the file was closed. */
 	ssize_t columnnumber;
 		/* The column where the cursor was. */
-	struct poshiststruct *next;
-		/* The next item of position history. */
-} poshiststruct;
+	char *anchors;
+		/* The line numbers where anchors were placed, in string form. */
+	struct positionstruct *next;
+		/* The next item in the positions register. */
+} positionstruct;
 #endif
 
 typedef struct openfilestruct {
@@ -524,9 +565,11 @@ typedef struct openfilestruct {
 	size_t current_x;
 		/* The file's x-coordinate position. */
 	size_t placewewant;
-		/* The file's x position we would like. */
-	ssize_t current_y;
-		/* The file's y-coordinate position. */
+		/* The preferred column for the cursor. */
+	size_t brink;
+		/* From which column the edit window is drawn (when panning). */
+	ssize_t cursor_row;
+		/* The row in the edit window that the cursor is on. */
 	struct stat *statinfo;
 		/* The file's stat information from when it was opened or last saved. */
 #ifdef ENABLE_WRAPPING
@@ -541,7 +584,7 @@ typedef struct openfilestruct {
 	bool softmark;
 		/* Whether a marked region was made by holding Shift. */
 	format_type fmt;
-		/* The file's format -- Unix or DOS or Mac. */
+		/* The file's format -- Unix or DOS. */
 	char *lock_filename;
 		/* The path of the lockfile, if we created one. */
 	undostruct *undotop;
@@ -590,9 +633,6 @@ typedef struct keystruct {
 #ifndef NANO_TINY
 	int toggle;
 		/* If a toggle, what we're toggling. */
-	int ordinal;
-		/* The how-manieth toggle this is, in order to be able to
-		 * keep them in sequence. */
 #endif
 #ifdef ENABLE_NANORC
 	char *expansion;
@@ -605,17 +645,14 @@ typedef struct keystruct {
 typedef struct funcstruct {
 	void (*func)(void);
 		/* The actual function to call. */
-	const char *desc;
-		/* The function's short description, for example "Where Is". */
+	const char *tag;
+		/* The function's help-line label, for example "Where Is". */
 #ifdef ENABLE_HELP
-	const char *help;
-		/* The help-screen text for this function. */
+	const char *phrase;
+		/* The function's description for in the help viewer. */
 	bool blank_after;
-		/* Whether there should be a blank line after the help text
-		 * for this function. */
+		/* Whether to distance this function from the next in the help viewer. */
 #endif
-	bool viewok;
-		/* Is this function allowed when in view mode? */
 	int menus;
 		/* In what menus this function applies. */
 	struct funcstruct *next;
@@ -623,8 +660,8 @@ typedef struct funcstruct {
 } funcstruct;
 
 #ifdef ENABLE_WORDCOMPLETION
-typedef struct completion_word {
+typedef struct completionstruct {
 	char *word;
-	struct completion_word *next;
-} completion_word;
+	struct completionstruct *next;
+} completionstruct;
 #endif

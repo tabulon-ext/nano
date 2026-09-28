@@ -1,8 +1,8 @@
 /**************************************************************************
  *   utils.c  --  This file is part of GNU nano.                          *
  *                                                                        *
- *   Copyright (C) 1999-2011, 2013-2021 Free Software Foundation, Inc.    *
- *   Copyright (C) 2016, 2017, 2019 Benno Schulenberg                     *
+ *   Copyright (C) 1999-2011, 2013-2026 Free Software Foundation, Inc.    *
+ *   Copyright (C) 2016, 2017, 2019, 2020, 2026 Benno Schulenberg         *
  *                                                                        *
  *   GNU nano is free software: you can redistribute it and/or modify     *
  *   it under the terms of the GNU General Public License as published    *
@@ -15,7 +15,7 @@
  *   See the GNU General Public License for more details.                 *
  *                                                                        *
  *   You should have received a copy of the GNU General Public License    *
- *   along with this program.  If not, see http://www.gnu.org/licenses/.  *
+ *   along with this program.  If not, see https://gnu.org/licenses/.     *
  *                                                                        *
  **************************************************************************/
 
@@ -28,27 +28,25 @@
 #include <string.h>
 #include <unistd.h>
 
-/* Return the user's home directory.  We use $HOME, and if that fails,
- * we fall back on the home directory of the effective user ID. */
+/* Set global variable `homedir` to the user's home directory.  First try
+ * $HOME, otherwise consult the password database for the current UID. */
 void get_homedir(void)
 {
 	if (homedir == NULL) {
 		const char *homenv = getenv("HOME");
 
 #ifdef HAVE_PWD_H
-		/* When HOME isn't set, or when we're root, get the home directory
-		 * from the password file instead. */
+		/* When $HOME is unset, or when we're root, try the database. */
 		if (homenv == NULL || geteuid() == ROOT_UID) {
 			const struct passwd *userage = getpwuid(geteuid());
 
-			if (userage != NULL)
+			if (userage)
 				homenv = userage->pw_dir;
 		}
 #endif
 
-		/* Only set homedir if some home directory could be determined,
-		 * otherwise keep homedir NULL. */
-		if (homenv != NULL && *homenv != '\0')
+		/* Only set `homedir` if a home directory could be determined. */
+		if (homenv && *homenv)
 			homedir = copy_of(homenv);
 	}
 }
@@ -61,7 +59,7 @@ const char *tail(const char *path)
 	if (slash == NULL)
 		return path;
 	else
-		return ++slash;
+		return slash + 1;
 }
 
 /* Return a copy of the two given strings, welded together. */
@@ -118,7 +116,7 @@ bool parse_num(const char *string, ssize_t *result)
 
 	value = (ssize_t)strtol(string, &excess, 10);
 
-	if (errno == ERANGE || *string == '\0' || *excess != '\0')
+	if (errno == ERANGE || *string == '\0' || *excess)
 		return FALSE;
 
 	*result = value;
@@ -126,29 +124,30 @@ bool parse_num(const char *string, ssize_t *result)
 	return TRUE;
 }
 
-/* Read two numbers, separated by a comma, from str, and store them in
- * *line and *column.  Return FALSE on error, and TRUE otherwise. */
-bool parse_line_column(const char *str, ssize_t *line, ssize_t *column)
+/* Read one number (or two numbers separated by comma, period, or colon)
+ * from the given string and store the number(s) in *line (and *column).
+ * Return FALSE on a failed parsing, and TRUE otherwise. */
+bool parse_line_column(const char *string, ssize_t *line, ssize_t *column)
 {
-	bool retval;
-	char *firstpart;
 	const char *comma;
+	char *firstpart;
+	bool retval;
 
-	while (*str == ' ')
-		str++;
+	while (*string == ' ')
+		string++;
 
-	comma = strpbrk(str, "m,. /;");
+	comma = strpbrk(string, ",.:");
 
 	if (comma == NULL)
-		return parse_num(str, line);
+		return parse_num(string, line);
 
 	retval = parse_num(comma + 1, column);
 
-	if (comma == str)
+	if (comma == string)
 		return retval;
 
-	firstpart = copy_of(str);
-	firstpart[comma - str] = '\0';
+	firstpart = copy_of(string);
+	firstpart[comma - string] = '\0';
 
 	retval = parse_num(firstpart, line) && retval;
 
@@ -168,14 +167,19 @@ void recode_NUL_to_LF(char *string, size_t length)
 	}
 }
 
-/* In the given string, recode each embedded newline as a NUL. */
-void recode_LF_to_NUL(char *string)
+/* In the given string, recode each embedded newline as a NUL,
+ * and return the number of bytes in the string. */
+size_t recode_LF_to_NUL(char *string)
 {
-	while (*string != '\0') {
+	char *beginning = string;
+
+	while (*string) {
 		if (*string == '\n')
 			*string = '\0';
 		string++;
 	}
+
+	return (string - beginning);
 }
 
 #if !defined(ENABLE_TINY) || defined(ENABLE_TABCOMP) || defined(ENABLE_BROWSER)
@@ -193,16 +197,13 @@ void free_chararray(char **array, size_t len)
 #endif
 
 #ifdef ENABLE_SPELLER
-/* Is the word starting at the given position in 'text' and of the given
+/* Is the word starting at the given position in `text` and of the given
  * length a separate word?  That is: is it not part of a longer word? */
 bool is_separate_word(size_t position, size_t length, const char *text)
 {
 	const char *before = text + step_left(text, position);
 	const char *after = text + position + length;
 
-	/* If the word starts at the beginning of the line OR the character before
-	 * the word isn't a letter, and if the word ends at the end of the line OR
-	 * the character after the word isn't a letter, we have a whole word. */
 	return ((position == 0 || !is_alpha_char(before)) &&
 					(*after == '\0' || !is_alpha_char(after)));
 }
@@ -213,8 +214,7 @@ bool is_separate_word(size_t position, size_t length, const char *text)
  * than the given start; otherwise, we find the first match starting no earlier
  * than start.  If we are doing a regexp search, and we find a match, we fill
  * in the global variable regmatches with at most 9 subexpression matches. */
-const char *strstrwrapper(const char *haystack, const char *needle,
-		const char *start)
+const char *strstrwrapper(const char *haystack, const char *needle, const char *start)
 {
 	if (ISSET(USE_REGEXP)) {
 		if (ISSET(BACKWARDS_SEARCH)) {
@@ -244,16 +244,14 @@ const char *strstrwrapper(const char *haystack, const char *needle,
 				next_rung = step_right(haystack, last_find);
 				regmatches[0].rm_so = next_rung;
 				regmatches[0].rm_eo = far_end;
-				if (regexec(&search_regexp, haystack, 1, regmatches,
-										REG_STARTEND) != 0)
+				if (regexec(&search_regexp, haystack, 1, regmatches, REG_STARTEND) != 0)
 					break;
 			}
 
 			/* Find the last match again, to get possible submatches. */
 			regmatches[0].rm_so = floor;
 			regmatches[0].rm_eo = far_end;
-			if (regexec(&search_regexp, haystack, 10, regmatches,
-										REG_STARTEND) != 0)
+			if (regexec(&search_regexp, haystack, 10, regmatches, REG_STARTEND) != 0)
 				return NULL;
 
 			return haystack + regmatches[0].rm_so;
@@ -262,8 +260,7 @@ const char *strstrwrapper(const char *haystack, const char *needle,
 		/* Do a forward regex search from the starting point. */
 		regmatches[0].rm_so = start - haystack;
 		regmatches[0].rm_eo = strlen(haystack);
-		if (regexec(&search_regexp, haystack, 10, regmatches,
-										REG_STARTEND) != 0)
+		if (regexec(&search_regexp, haystack, 10, regmatches, REG_STARTEND) != 0)
 			return NULL;
 		else
 			return haystack + regmatches[0].rm_so;
@@ -282,34 +279,26 @@ const char *strstrwrapper(const char *haystack, const char *needle,
 		return mbstrcasestr(start, needle);
 }
 
-/* This is a wrapper for the malloc() function that properly handles
- * things when we run out of memory. */
+/* Allocate the given amount of memory and return a pointer to it. */
 void *nmalloc(size_t howmuch)
 {
-	void *r = malloc(howmuch);
+	void *section = malloc(howmuch);
 
-	if (howmuch == 0)
-		die("Allocating zero bytes.  Please report a bug.\n");
-
-	if (r == NULL)
+	if (section == NULL)
 		die(_("Nano is out of memory!\n"));
 
-	return r;
+	return section;
 }
 
-/* This is a wrapper for the realloc() function that properly handles
- * things when we run out of memory. */
-void *nrealloc(void *ptr, size_t howmuch)
+/* Reallocate the given section of memory to have the given size. */
+void *nrealloc(void *section, size_t howmuch)
 {
-	void *r = realloc(ptr, howmuch);
+	section = realloc(section, howmuch);
 
-	if (howmuch == 0)
-		die("Allocating zero bytes.  Please report a bug.\n");
-
-	if (r == NULL)
+	if (section == NULL)
 		die(_("Nano is out of memory!\n"));
 
-	return r;
+	return section;
 }
 
 /* Return an appropriately reallocated dest string holding a copy of src.
@@ -354,6 +343,22 @@ char *free_and_assign(char *dest, char *src)
  * displayed in the edit window when the cursor is at the given column. */
 size_t get_page_start(size_t column)
 {
+#ifndef NANO_TINY
+	if (united_sidescroll) {
+		if (column < CUSHION)
+			return 0;
+		else if (column < openfile->brink + CUSHION) {
+			if (ISSET(JUMPY_SCROLLING))
+				return (column > editwincols / 2) ? column - editwincols / 2 : 0;
+			else
+				return column - CUSHION;
+		} else if (column > openfile->brink + editwincols - CUSHION - 1)
+			return column - editwincols + (ISSET(JUMPY_SCROLLING) ? editwincols / 2 : CUSHION) + 1;
+		else
+			return openfile->brink;
+	}
+#endif
+
 	if (column == 0 || column + 2 < editwincols || ISSET(SOFTWRAP))
 		return 0;
 	else if (editwincols > 8)
@@ -362,15 +367,8 @@ size_t get_page_start(size_t column)
 		return column - (editwincols - 2);
 }
 
-/* Return the placewewant associated with current_x, i.e. the zero-based
- * column position of the cursor. */
-size_t xplustabs(void)
-{
-	return wideness(openfile->current->data, openfile->current_x);
-}
-
-/* Return the index in text of the character that (when displayed) will
- * not overshoot the given column. */
+/* Return the index in the given text of the character that (when displayed)
+ * will not overshoot the given column. */
 size_t actual_x(const char *text, size_t column)
 {
 	const char *start = text;
@@ -378,7 +376,7 @@ size_t actual_x(const char *text, size_t column)
 	size_t width = 0;
 		/* The current accumulated span, in columns. */
 
-	while (*text != '\0') {
+	while (*text) {
 		int charlen = advance_over(text, &width);
 
 		if (width > column)
@@ -390,22 +388,21 @@ size_t actual_x(const char *text, size_t column)
 	return (text - start);
 }
 
-/* A strnlen() with tabs and multicolumn characters factored in:
- * how many columns wide are the first maxlen bytes of text? */
-size_t wideness(const char *text, size_t maxlen)
+/* Return the number of columns that the first count bytes of text occupy. */
+size_t wideness(const char *text, size_t count)
 {
 	size_t width = 0;
 
-	if (maxlen == 0)
+	if (count == 0)
 		return 0;
 
-	while (*text != '\0') {
+	while (*text) {
 		size_t charlen = advance_over(text, &width);
 
-		if (maxlen <= charlen)
+		if (count <= charlen)
 			break;
 
-		maxlen -= charlen;
+		count -= charlen;
 		text += charlen;
 	}
 
@@ -417,10 +414,16 @@ size_t breadth(const char *text)
 {
 	size_t span = 0;
 
-	while (*text != '\0')
+	while (*text)
 		text += advance_over(text, &span);
 
 	return span;
+}
+
+/* Return the (zero-based) column position of the cursor. */
+size_t xplustabs(void)
+{
+	return wideness(openfile->current->data, openfile->current_x);
 }
 
 /* Append a new magic line to the end of the buffer. */
@@ -437,8 +440,9 @@ void new_magicline(void)
  * it isn't the only line in the file. */
 void remove_magicline(void)
 {
-	if (openfile->filebot->data[0] == '\0' &&
-				openfile->filebot != openfile->filetop) {
+	if (openfile->filebot->data[0] == '\0' && openfile->filebot != openfile->filetop) {
+		if (openfile->current == openfile->filebot)
+			openfile->current = openfile->current->prev;
 		openfile->filebot = openfile->filebot->prev;
 		delete_node(openfile->filebot->next);
 		openfile->filebot->next = NULL;
@@ -492,7 +496,9 @@ void get_range(linestruct **top, linestruct **bot)
 			also_the_last = TRUE;
 	}
 }
+#endif /* !NANO_TINY */
 
+#if !defined(NANO_TINY) || defined(ENABLE_SPELLER) || defined (ENABLE_LINTER) || defined (ENABLE_FORMATTER)
 /* Return a pointer to the line that has the given line number. */
 linestruct *line_from_number(ssize_t number)
 {
@@ -507,7 +513,7 @@ linestruct *line_from_number(ssize_t number)
 
 	return line;
 }
-#endif /* !NANO_TINY */
+#endif
 
 /* Count the number of characters from begin to end, and return it. */
 size_t number_of_characters_in(const linestruct *begin, const linestruct *end)
